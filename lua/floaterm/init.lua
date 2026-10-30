@@ -89,6 +89,14 @@ function M.cycle(dir)
   show((M.state.current - 1 + dir) % n + 1)
 end
 
+-- move to terminal at given index
+function M.select(index)
+  prune()
+  if index <= #M.state.terms then
+    show(index)
+  end
+end
+
 -- Open the current terminal in a regular split instead of the float
 function M.split()
   prune()
@@ -103,5 +111,26 @@ function M.split()
   vim.cmd.split()
   vim.api.nvim_win_set_buf(0, buf)
 end
+
+vim.api.nvim_create_autocmd('TermClose', {
+  group = vim.api.nvim_create_augroup('floaterm', { clear = true }),
+  callback = function(ev)
+    -- Defer: buffers can't always be deleted from inside TermClose
+    vim.schedule(function()
+      local s = M.state
+      local was_visible = vim.api.nvim_win_is_valid(s.win) and vim.api.nvim_win_get_buf(s.win) == ev.buf
+
+      if vim.api.nvim_buf_is_valid(ev.buf) then
+        vim.api.nvim_buf_delete(ev.buf, { force = true })
+      end
+      prune()
+
+      -- If you were looking at the one that died, land on another
+      if was_visible and #s.terms > 0 then
+        show(s.current)
+      end
+    end)
+  end,
+})
 
 return M
